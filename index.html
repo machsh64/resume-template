@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简历网站</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- 左侧编辑区 -->
+    <aside class="editor-panel">
+      <header class="editor-header">
+        <h1>简历编辑</h1>
+        <div class="editor-actions">
+          <button type="button" class="btn-download" id="btnSaveJson">保存 JSON</button>
+          <button type="button" class="btn-download" id="btnDownload">下载 PDF</button>
+        </div>
+      </header>
+
+      <form class="editor-form" id="resumeForm">
+        <!-- 个人信息 -->
+        <section class="form-section">
+          <h2 class="form-section-title">个人信息</h2>
+          <div class="form-grid">
+            <label>姓名 <input type="text" name="name" placeholder="your-name" /></label>
+            <label>性别 <input type="text" name="gender" value="男" placeholder="男/女" /></label>
+            <label>电话 <input type="tel" name="phone" placeholder="your-phone" /></label>
+            <label>邮箱 <input type="email" name="email" placeholder="your-email" /></label>
+            <label>工作经验 <input type="text" name="workYears" placeholder="如：3年工作经验" /></label>
+            <label>求职意向 <input type="text" name="jobIntent" placeholder="如：Java 开发" /></label>
+          </div>
+        </section>
+
+        <!-- 教育经历 -->
+        <section class="form-section">
+          <h2 class="form-section-title">教育经历</h2>
+          <div class="form-grid">
+            <label>学校 <input type="text" name="eduSchool" placeholder="开普敦大学" /></label>
+            <label>学历 <select name="eduDegree"><option value="本科">本科</option><option value="专科">专科</option><option value="硕士">硕士</option><option value="博士">博士</option></select></label>
+            <label>专业 <input type="text" name="eduMajor" placeholder="软件工程" /></label>
+            <label>就读时间 <input type="text" name="eduStart" placeholder="如：2018" /></label>
+            <label>结束时间 <input type="text" name="eduEnd" placeholder="如：2022" /></label>
+          </div>
+        </section>
+
+        <!-- 专业技能 -->
+        <section class="form-section">
+          <h2 class="form-section-title">专业技能</h2>
+          <label class="form-full">
+            <span>支持 Markdown</span>
+            <textarea name="skills" rows="10" placeholder="框架：SpringMvc、SpringBoot...&#10;数据库：MySQL、Dameng..."></textarea>
+          </label>
+        </section>
+
+        <!-- 工作经历 -->
+        <section class="form-section">
+          <h2 class="form-section-title">工作经历</h2>
+          <div id="workList" class="repeat-list"></div>
+          <button type="button" class="btn-add" id="addWork">+ 添加一段工作经历</button>
+        </section>
+
+        <!-- 项目经历 -->
+        <section class="form-section">
+          <h2 class="form-section-title">项目经历</h2>
+          <div id="projectList" class="repeat-list"></div>
+          <button type="button" class="btn-add" id="addProject">+ 添加一个项目</button>
+        </section>
+
+        <!-- 自我评价 -->
+        <section class="form-section">
+          <h2 class="form-section-title">自我评价</h2>
+          <label class="form-full">
+            <span>支持 Markdown</span>
+            <textarea name="evaluation" rows="6" placeholder="简要描述个人优势、工作态度等"></textarea>
+          </label>
+        </section>
+      </form>
+    </aside>
+
+    <!-- 右侧预览区：分页显示，每页 A4 高度 -->
+    <main class="preview-panel">
+      <div class="preview-wrap">
+        <!-- 用于表单绑定和克隆的源（不可见），内容与分页一致 -->
+        <div class="preview-paper preview-source" id="resumePreview" aria-hidden="true">
+          <!-- 个人信息（淡蓝顶栏：姓名左对齐，下方一行 男|电话|邮箱|期望工作职位: xxx） -->
+          <header class="resume-header">
+            <h1 class="resume-name" data-bind="name">your-name</h1>
+            <div class="resume-meta-one-line" id="previewHeaderMeta">
+              <span data-bind="gender">gender</span>
+              <span class="sep">  </span>
+              <span data-bind="phone">your-phone</span>
+              <span class="sep">  </span>
+              <span data-bind="email">your-email</span>
+            </div>
+            <div class="resume-meta-one-line" id="previewHeaderMeta">           
+              <span data-bind="workYears">workYears</span>
+              <span class="sep">  </span>
+              求职意向：<span data-bind="jobIntent">jobIntent</span>
+            </div>
+          </header>
+
+          <div class="resume-body">
+            <section class="resume-block">
+              <h2 class="resume-block-title">教育经历</h2>
+              <div class="resume-block-content" id="previewEdu">
+                <div class="edu-head-line">
+                  <span class="edu-school" data-bind="eduSchool">eduSchool</span>
+                  <span class="edu-degree" data-bind="eduDegree">eduDegree</span>
+                  <span class="edu-major" data-bind="eduMajor">eduMajor</span>
+                  <span class="edu-time" data-bind="eduTime">eduTime</span>
+                </div>
+              </div>
+            </section>
+            <section class="resume-block">
+              <h2 class="resume-block-title">专业技能</h2>
+              <div class="resume-block-content-skill md-content" id="previewSkills"></div>
+            </section>
+            <section class="resume-block">
+              <h2 class="resume-block-title">工作经历</h2>
+              <div class="resume-block-content" id="previewWork"></div>
+            </section>
+            <section class="resume-block">
+              <h2 class="resume-block-title">项目经历</h2>
+              <div class="resume-block-content" id="previewProject"></div>
+            </section>
+            <section class="resume-block">
+              <h2 class="resume-block-title">自我评价</h2>
+              <div class="resume-block-content md-content" id="previewEvaluation"></div>
+            </section>
+          </div>
+        </div>
+        <!-- 分页预览容器：由 JS 填充多页 -->
+        <div class="preview-pages" id="previewPages"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 工作经历项模板 -->
+  <template id="tplWork">
+    <div class="repeat-item" data-index="">
+      <label>公司 <input type="text" name="workCompany" placeholder="公司名称" /></label>
+      <label>岗位 <input type="text" name="workPosition" placeholder="所在岗位" /></label>
+      <label>工作时间 <input type="text" name="workTime" placeholder="如：2024.04-2025.01" /></label>
+      <button type="button" class="btn-remove">删除</button>
+    </div>
+  </template>
+
+  <!-- 项目经历项模板 -->
+  <template id="tplProject">
+    <div class="repeat-item" data-index="">
+      <label>项目名称 <input type="text" name="projectName" placeholder="项目名称" /></label>
+      <label>担任角色 <input type="text" name="projectRole" placeholder="如：后端开发" /></label>
+      <label>项目时间 <input type="text" name="projectTime" placeholder="如：2024.05-2025.01" /></label>
+      <label>项目内容（MD）<textarea name="projectContent" rows="4" placeholder="开发团队、技术框架等"></textarea></label>
+      <label>项目业绩（MD）<textarea name="projectAchieve" rows="4" placeholder="业绩描述"></textarea></label>
+      <button type="button" class="btn-remove">删除</button>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

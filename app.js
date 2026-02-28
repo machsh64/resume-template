@@ -1,0 +1,578 @@
+(function () {
+  'use strict';
+
+  const form = document.getElementById('resumeForm');
+  const preview = document.getElementById('resumePreview');
+  const tplWork = document.getElementById('tplWork');
+  const tplProject = document.getElementById('tplProject');
+  const workList = document.getElementById('workList');
+  const projectList = document.getElementById('projectList');
+
+  // 配置 marked
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({ breaks: true });
+  }
+
+  function parseMd(text) {
+    if (!text || !text.trim()) return '';
+    if (typeof marked !== 'undefined') {
+      return marked.parse(text.trim());
+    }
+    return text.replace(/\n/g, '<br>');
+  }
+
+  // 简单数据绑定：表单 -> 预览
+  function bindPreview() {
+    const name = form.querySelector('[name="name"]');
+    const gender = form.querySelector('[name="gender"]');
+    const phone = form.querySelector('[name="phone"]');
+    const email = form.querySelector('[name="email"]');
+    const workYears = form.querySelector('[name="workYears"]');
+    const jobIntent = form.querySelector('[name="jobIntent"]');
+
+    const set = (sel, val) => {
+      const el = preview.querySelector('[data-bind="' + sel + '"]');
+      if (el) el.textContent = val != null ? val : '';
+    };
+
+    const updateHeader = () => {
+      set('name', name?.value);
+      set('gender', gender?.value);
+      set('phone', phone?.value);
+      set('email', email?.value);
+      set('workYears', workYears?.value);
+      set('jobIntent', jobIntent?.value);
+    };
+
+    [name, gender, phone, email, workYears, jobIntent].forEach(el => {
+      if (el) el.addEventListener('input', function () { updateHeader(); scheduleBuildPaginatedPreview(); });
+    });
+    updateHeader();
+
+    // 教育
+    const eduSchool = form.querySelector('[name="eduSchool"]');
+    const eduDegree = form.querySelector('[name="eduDegree"]');
+    const eduMajor = form.querySelector('[name="eduMajor"]');
+    const eduStart = form.querySelector('[name="eduStart"]');
+    const eduEnd = form.querySelector('[name="eduEnd"]');
+
+    const updateEdu = () => {
+      const schoolEl = preview.querySelector('#previewEdu .edu-school');
+      const degreeEl = preview.querySelector('#previewEdu .edu-degree');
+      const timeEl = preview.querySelector('#previewEdu .edu-time');
+      const majorEl = preview.querySelector('#previewEdu .edu-major');
+      if (schoolEl) schoolEl.textContent = eduSchool?.value ?? '';
+      if (degreeEl) degreeEl.textContent = eduDegree?.value ?? '';
+      if (majorEl) majorEl.textContent = eduMajor?.value ?? '';
+      const start = eduStart?.value?.trim() ?? '';
+      const end = eduEnd?.value?.trim() ?? '';
+      if (timeEl) timeEl.textContent = start && end ? start + '-' + end : start || end;
+    };
+
+    [eduSchool, eduDegree, eduMajor, eduStart, eduEnd].forEach(el => {
+      if (el) el.addEventListener('input', function () { updateEdu(); scheduleBuildPaginatedPreview(); });
+    });
+    updateEdu();
+
+    // 专业技能（Markdown）
+    const skills = form.querySelector('[name="skills"]');
+    const previewSkills = document.getElementById('previewSkills');
+    if (skills && previewSkills) {
+      const updateSkills = () => {
+        previewSkills.innerHTML = parseMd(skills.value || '');
+      };
+      skills.addEventListener('input', function () { updateSkills(); scheduleBuildPaginatedPreview(); });
+      updateSkills();
+    }
+
+    // 自我评价（Markdown）
+    const evaluation = form.querySelector('[name="evaluation"]');
+    const previewEvaluation = document.getElementById('previewEvaluation');
+    if (evaluation && previewEvaluation) {
+      const updateEval = () => {
+        previewEvaluation.innerHTML = parseMd(evaluation.value || '');
+      };
+      evaluation.addEventListener('input', function () { updateEval(); scheduleBuildPaginatedPreview(); });
+      updateEval();
+    }
+    scheduleBuildPaginatedPreview();
+  }
+
+  // 工作经历列表
+  function collectWorkItems() {
+    const items = [];
+    workList.querySelectorAll('.repeat-item').forEach((node, i) => {
+      const company = node.querySelector('[name="workCompany"]')?.value?.trim();
+      const position = node.querySelector('[name="workPosition"]')?.value?.trim();
+      const time = node.querySelector('[name="workTime"]')?.value?.trim();
+      items.push({ company, position, time });
+    });
+    return items;
+  }
+
+  function renderWorkPreview() {
+    const items = collectWorkItems();
+    const container = document.getElementById('previewWork');
+    container.innerHTML = items.filter(i => i.company || i.position || i.time).map(item => `
+      <div class="work-item">
+        <div class="work-head-line">
+          <span class="work-company">${escapeHtml(item.company)}</span>
+          <span class="work-position">${escapeHtml(item.position)}</span>
+          <span class="work-time">${escapeHtml(item.time)}</span>
+        </div>
+      </div>
+    `).join('');
+    scheduleBuildPaginatedPreview();
+  }
+
+  function addWorkItem(data) {
+    const frag = tplWork.content.cloneNode(true);
+    const item = frag.querySelector('.repeat-item');
+    item.dataset.index = workList.children.length;
+    if (data) {
+      item.querySelector('[name="workCompany"]').value = data.company || '';
+      item.querySelector('[name="workPosition"]').value = data.position || '';
+      item.querySelector('[name="workTime"]').value = data.time || '';
+    }
+    item.querySelector('.btn-remove').addEventListener('click', () => {
+      item.remove();
+      renderWorkPreview();
+    });
+    ['workCompany', 'workPosition', 'workTime'].forEach(name => {
+      item.querySelector('[name="' + name + '"]').addEventListener('input', renderWorkPreview);
+    });
+    workList.appendChild(frag);
+    renderWorkPreview();
+  }
+
+  // 项目经历列表
+  function collectProjectItems() {
+    const items = [];
+    projectList.querySelectorAll('.repeat-item').forEach((node) => {
+      const name = node.querySelector('[name="projectName"]')?.value?.trim();
+      const role = node.querySelector('[name="projectRole"]')?.value?.trim();
+      const time = node.querySelector('[name="projectTime"]')?.value?.trim();
+      const content = node.querySelector('[name="projectContent"]')?.value?.trim();
+      const achieve = node.querySelector('[name="projectAchieve"]')?.value?.trim();
+      items.push({ name, role, time, content, achieve });
+    });
+    return items;
+  }
+
+  function renderProjectPreview() {
+    const items = collectProjectItems();
+    const container = document.getElementById('previewProject');
+    container.innerHTML = items.filter(i => i.name || i.content || i.achieve).map(item => `
+      <div class="project-item">
+        <div class="project-head-line">
+          <span class="project-name">${escapeHtml(item.name)}</span>
+          <span class="project-role">${escapeHtml(item.role)}</span>
+          <span class="project-time">${escapeHtml(item.time)}</span>
+        </div>
+        ${item.content ? '<div class="project-label">内容:</div><div class="project-content md-content">' + parseMd(item.content) + '</div>' : ''}
+        ${item.achieve ? '<div class="project-label">业绩:</div><div class="project-achieve md-content">' + parseMd(item.achieve) + '</div>' : ''}
+      </div>
+    `).join('');
+    scheduleBuildPaginatedPreview();
+  }
+
+  function collectFormData() {
+    const personal = {
+      name: form.querySelector('[name="name"]')?.value || '',
+      gender: form.querySelector('[name="gender"]')?.value || '',
+      phone: form.querySelector('[name="phone"]')?.value || '',
+      email: form.querySelector('[name="email"]')?.value || '',
+      workYears: form.querySelector('[name="workYears"]')?.value || '',
+      jobIntent: form.querySelector('[name="jobIntent"]')?.value || '',
+    };
+
+    const education = {
+      school: form.querySelector('[name="eduSchool"]')?.value || '',
+      degree: form.querySelector('[name="eduDegree"]')?.value || '',
+      major: form.querySelector('[name="eduMajor"]')?.value || '',
+      start: form.querySelector('[name="eduStart"]')?.value || '',
+      end: form.querySelector('[name="eduEnd"]')?.value || '',
+    };
+
+    const skillsMd = form.querySelector('[name="skills"]')?.value || '';
+    const evaluationMd = form.querySelector('[name="evaluation"]')?.value || '';
+
+    return {
+      personal,
+      education,
+      skillsMd,
+      work: collectWorkItems(),
+      projects: collectProjectItems(),
+      evaluationMd,
+    };
+  }
+
+  // 启动时从 /api/resume 读取初始数据（如果存在）
+  async function loadInitialData() {
+    try {
+      const res = await fetch('/api/resume', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const setVal = (name, value) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el && value != null) el.value = value;
+      };
+
+      const p = data.personal || {};
+      setVal('name', p.name);
+      setVal('gender', p.gender);
+      setVal('phone', p.phone);
+      setVal('email', p.email);
+      setVal('workYears', p.workYears);
+      setVal('jobIntent', p.jobIntent);
+
+      const e = data.education || {};
+      setVal('eduSchool', e.school);
+      setVal('eduDegree', e.degree);
+      setVal('eduMajor', e.major);
+      setVal('eduStart', e.start);
+      setVal('eduEnd', e.end);
+
+      if (typeof data.skillsMd === 'string') {
+        setVal('skills', data.skillsMd);
+      }
+      if (typeof data.evaluationMd === 'string') {
+        setVal('evaluation', data.evaluationMd);
+      }
+
+      // 覆盖默认的工作经历与项目经历
+      if (Array.isArray(data.work)) {
+        workList.innerHTML = '';
+        data.work.forEach(w => addWorkItem(w));
+      }
+      if (Array.isArray(data.projects)) {
+        projectList.innerHTML = '';
+        data.projects.forEach(pj => addProjectItem(pj));
+      }
+
+      // 触发预览与分页更新
+      const ev = new Event('input', { bubbles: true });
+      form.querySelectorAll('input, textarea, select').forEach(el => el.dispatchEvent(ev));
+      renderWorkPreview();
+      renderProjectPreview();
+      scheduleBuildPaginatedPreview();
+    } catch (err) {
+      console.error('加载 data.json 失败:', err);
+    }
+  }
+
+  function addProjectItem(data) {
+    const frag = tplProject.content.cloneNode(true);
+    const item = frag.querySelector('.repeat-item');
+    item.dataset.index = projectList.children.length;
+    if (data) {
+      item.querySelector('[name="projectName"]').value = data.name || '';
+      item.querySelector('[name="projectRole"]').value = data.role || '';
+      item.querySelector('[name="projectTime"]').value = data.time || '';
+      item.querySelector('[name="projectContent"]').value = data.content || '';
+      item.querySelector('[name="projectAchieve"]').value = data.achieve || '';
+    }
+    item.querySelector('.btn-remove').addEventListener('click', () => {
+      item.remove();
+      renderProjectPreview();
+    });
+    ['projectName', 'projectRole', 'projectTime', 'projectContent', 'projectAchieve'].forEach(name => {
+      const input = item.querySelector('[name="' + name + '"]');
+      if (input) input.addEventListener('input', renderProjectPreview);
+    });
+    projectList.appendChild(frag);
+    renderProjectPreview();
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function stripIds(root) {
+    if (!root || root.nodeType !== 1) return;
+    if (root.id) root.removeAttribute('id');
+    const nodes = root.querySelectorAll('[id]');
+    nodes.forEach(n => n.removeAttribute('id'));
+  }
+
+  function createPreviewPage(pagesContainer) {
+    const pageDiv = document.createElement('div');
+    pageDiv.className = 'preview-page';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'page-content';
+    pageDiv.appendChild(contentDiv);
+    pagesContainer.appendChild(pageDiv);
+    return contentDiv;
+  }
+
+  function isOverflowing(pageContent) {
+    return pageContent.scrollHeight - pageContent.clientHeight > 1;
+  }
+
+  function buildPaginatedPreview() {
+    const pagesContainer = document.getElementById('previewPages');
+    if (!pagesContainer) return;
+
+    pagesContainer.innerHTML = '';
+
+    // 从“源简历”读取最新内容并按页面实际溢出分页（避免出现大空白）
+    const headerSrc = preview.querySelector('.resume-header');
+    const bodySrc = preview.querySelector('.resume-body');
+    const blocksSrc = bodySrc ? Array.from(bodySrc.querySelectorAll(':scope > .resume-block')) : [];
+
+    let pageContent = createPreviewPage(pagesContainer);
+
+    const headerNode = headerSrc ? headerSrc.cloneNode(true) : null;
+    if (headerNode) {
+      stripIds(headerNode);
+      pageContent.appendChild(headerNode);
+    }
+
+    const appendBlockWithFit = (blockNode) => {
+      stripIds(blockNode);
+      const hadContent = pageContent.childElementCount > 0;
+      pageContent.appendChild(blockNode);
+      if (hadContent && isOverflowing(pageContent)) {
+        pageContent.removeChild(blockNode);
+        pageContent = createPreviewPage(pagesContainer);
+        pageContent.appendChild(blockNode);
+      }
+    };
+
+    // 子元素分页：每一页都带模块标题（适用于教育、技能、工作等）
+    const paginateBlockChildrenRepeatTitle = (blockSrc) => {
+      const titleSrc = blockSrc.querySelector('.resume-block-title');
+      const contentSrc = blockSrc.querySelector('.resume-block-content');
+      if (!titleSrc || !contentSrc) {
+        const whole = blockSrc.cloneNode(true);
+        appendBlockWithFit(whole);
+        return;
+      }
+
+      const childNodes = Array.from(contentSrc.children);
+      if (childNodes.length === 0) {
+        const whole = blockSrc.cloneNode(true);
+        appendBlockWithFit(whole);
+        return;
+      }
+
+      const makeSection = () => {
+        const sec = document.createElement('section');
+        sec.className = blockSrc.className || 'resume-block';
+        const title = titleSrc.cloneNode(true);
+        stripIds(title);
+        const content = contentSrc.cloneNode(false);
+        stripIds(content);
+        sec.appendChild(title);
+        sec.appendChild(content);
+        return { sec, content };
+      };
+
+      let current = makeSection();
+      appendBlockWithFit(current.sec);
+
+      childNodes.forEach((childSrc) => {
+        const item = childSrc.cloneNode(true);
+        current.content.appendChild(item);
+        if (isOverflowing(pageContent)) {
+          current.content.removeChild(item);
+          pageContent = createPreviewPage(pagesContainer);
+          current = makeSection();
+          pageContent.appendChild(current.sec);
+          current.content.appendChild(item);
+        }
+      });
+    };
+
+    // 子元素分页：模块标题只在第一页出现（适用于“项目经历”）
+    const paginateBlockChildrenNoRepeatTitle = (blockSrc) => {
+      const titleSrc = blockSrc.querySelector('.resume-block-title');
+      const contentSrc = blockSrc.querySelector('.resume-block-content');
+      if (!titleSrc || !contentSrc) {
+        const whole = blockSrc.cloneNode(true);
+        appendBlockWithFit(whole);
+        return;
+      }
+
+    const children = Array.from(contentSrc.children);
+    if (children.length === 0) {
+        const whole = blockSrc.cloneNode(true);
+        appendBlockWithFit(whole);
+        return;
+      }
+
+      const makeSectionFirst = () => {
+        const sec = document.createElement('section');
+        sec.className = blockSrc.className || 'resume-block';
+        const title = titleSrc.cloneNode(true);
+        stripIds(title);
+        const content = contentSrc.cloneNode(false);
+        stripIds(content);
+        sec.appendChild(title);
+        sec.appendChild(content);
+        return { sec, content };
+      };
+
+      const makeSectionContinue = () => {
+        const sec = document.createElement('section');
+        // 续页 section 增加标记类，用于控制垂头样式
+        sec.className = (blockSrc.className || 'resume-block') + ' resume-block-continued';
+        const content = contentSrc.cloneNode(false);
+        stripIds(content);
+        sec.appendChild(content);
+        return { sec, content };
+      };
+
+      // project 模块内容按照「项目内的每一行/块」为单位分页，
+      // 第二个项目可以从第一页开始，超出的部分自然接到下一页。
+      const units = [];
+
+      children.forEach((child) => {
+        if (child.classList.contains('project-item')) {
+          const wrapperClass = child.className || 'project-item';
+          const parts = Array.from(child.children);
+          parts.forEach((part) => {
+            const node = part.cloneNode(true);
+            stripIds(node);
+            units.push({ wrapperClass, node });
+          });
+        } else {
+          const node = child.cloneNode(true);
+          stripIds(node);
+          units.push({ wrapperClass: null, node });
+        }
+      });
+
+      let current = makeSectionFirst();
+      appendBlockWithFit(current.sec);
+      let currentWrapper = null;
+
+      units.forEach((unit) => {
+        if (unit.wrapperClass) {
+          if (!currentWrapper || currentWrapper.className !== unit.wrapperClass) {
+            currentWrapper = document.createElement('div');
+            currentWrapper.className = unit.wrapperClass;
+            current.content.appendChild(currentWrapper);
+          }
+          currentWrapper.appendChild(unit.node);
+          if (isOverflowing(pageContent)) {
+            // 当前块放不下，挪到下一页的“续页” section
+            currentWrapper.removeChild(unit.node);
+            if (!currentWrapper.children.length) {
+              current.content.removeChild(currentWrapper);
+            }
+            pageContent = createPreviewPage(pagesContainer);
+            current = makeSectionContinue();
+            pageContent.appendChild(current.sec);
+            currentWrapper = document.createElement('div');
+            currentWrapper.className = unit.wrapperClass;
+            current.content.appendChild(currentWrapper);
+            currentWrapper.appendChild(unit.node);
+          }
+        } else {
+          const node = unit.node;
+          current.content.appendChild(node);
+          if (isOverflowing(pageContent)) {
+            current.content.removeChild(node);
+            pageContent = createPreviewPage(pagesContainer);
+            current = makeSectionContinue();
+            pageContent.appendChild(current.sec);
+            current.content.appendChild(node);
+          }
+        }
+      });
+    };
+
+    blocksSrc.forEach((blockSrc) => {
+      const isProjectBlock = !!blockSrc.querySelector('#previewProject');
+      const isSkillsBlock = !!blockSrc.querySelector('#previewSkills');
+
+      if (isProjectBlock) {
+        // “项目经历”模块：标题只在第一页出现，其余页只继续内容
+        paginateBlockChildrenNoRepeatTitle(blockSrc);
+      } else if (isSkillsBlock) {
+        // 专业技能：内容相对较短，整体作为一个块处理，避免 Markdown 子节点被拆分页导致丢失
+        const whole = blockSrc.cloneNode(true);
+        appendBlockWithFit(whole);
+      } else {
+        // 其他模块：每页可重复标题，排版更清晰
+        paginateBlockChildrenRepeatTitle(blockSrc);
+      }
+    });
+  }
+
+  function scheduleBuildPaginatedPreview() {
+    requestAnimationFrame(function () {
+      buildPaginatedPreview();
+    });
+  }
+
+  // 初始化：默认两条工作、两个项目（与 template 一致）
+  addWorkItem({ company: 'your-company', position: 'workPosition', time: '2024.04-2025.01' });
+
+  addProjectItem({
+    name: 'projectName',
+    role: 'projectRole',
+    time: '2024.05-2025.01',
+    content: 'content',
+    achieve: 'achieve'
+  });
+
+
+  bindPreview();
+
+  // 如果存在 data.json，则用其中的数据覆盖默认示例
+  loadInitialData();
+
+  document.getElementById('addWork').addEventListener('click', () => addWorkItem());
+  document.getElementById('addProject').addEventListener('click', () => addProjectItem());
+
+  // 保存 JSON：调用后端 /api/resume 自动写入 data.json
+  document.getElementById('btnSaveJson').addEventListener('click', async function () {
+    const data = collectFormData();
+    try {
+      const res = await fetch('/api/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('保存失败');
+      Swal.fire({
+        title: '保存成功',
+        text: '信息已保存到 data.json',
+        icon: 'success',
+        timer: 2000, 
+        timerProgressBar: true, 
+        showConfirmButton: false
+      });
+    } catch (e) {
+      console.error(e);
+      Swal.fire({
+        title: '保存失败',
+        text: '请检查终端是否已启动 Node 服务',
+        icon: 'error',
+        timer: 2000, 
+        timerProgressBar: true, 
+        showConfirmButton: false 
+      });
+    }
+  });
+
+  // PDF 下载：导出分页容器，内容按 A4 高度自动分页
+  document.getElementById('btnDownload').addEventListener('click', function () {
+    const pagesContainer = document.getElementById('previewPages');
+    const target = pagesContainer && pagesContainer.children.length > 0 ? pagesContainer : preview;
+    const opt = {
+      margin: 0,
+      filename: (form.querySelector('[name="name"]')?.value || '简历') + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(target).save();
+  });
+})();

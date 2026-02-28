@@ -1,0 +1,589 @@
+/* 与图片完全一致：淡蓝顶栏、姓名左对齐、单栏、两行布局、缩进、时间右对齐、统一无衬线字体 */
+
+:root {
+  --header-bg: #e6f7ff;
+  --header-text: #1a1a1a;
+  --title-bar: #e6f7ff;
+  --left-line: #00a4b3;
+  --text-primary: #1a1a1a;
+  --text-secondary: #333;
+  --border-light: #e0e0e0;
+  --paper-bg: #fff;
+  --paper-width: 210mm;
+  --paper-height: 297mm;
+  --content-margin: 1.15cm;
+  --font-resume: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-resume);
+  font-size: 14px;
+  color: #333;
+  background: #f0f0f0;
+}
+
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ========== 左侧编辑区 ========== */
+.editor-panel {
+  width: 400px;
+  min-width: 360px;
+  background: #fff;
+  border-right: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.editor-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-download {
+  padding: 8px 16px;
+  background: var(--header-bg);
+  color: var(--header-text);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-download:hover {
+  filter: brightness(1.1);
+}
+
+.editor-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section-title {
+  margin: 0 0 12px 0;
+  padding-left: 10px;
+  border-left: 4px solid var(--title-bar);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.form-grid label,
+.form-full label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.form-grid label {
+  min-width: 160px;
+  flex: 1;
+}
+
+.form-full {
+  width: 100%;
+}
+
+.form-full textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.form-grid input,
+.form-grid select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.repeat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.repeat-item {
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+}
+
+.repeat-item label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.repeat-item label:last-of-type {
+  margin-bottom: 0;
+}
+
+.repeat-item input[type="text"],
+.repeat-item textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.repeat-item textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.btn-add {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--title-bar);
+  color: var(--title-bar);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-add:hover {
+  background: #f0f6ff;
+}
+
+.btn-remove {
+  margin-top: 8px;
+  padding: 4px 10px;
+  background: #e0e0e0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-remove:hover {
+  background: #d0d0d0;
+}
+
+/* ========== 右侧预览区 ========== */
+.preview-panel {
+  flex: 1;
+  padding: 24px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: #e5e5e5;
+}
+
+.preview-wrap {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  background: #999;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+/* 源简历：仅用于绑定与克隆，不显示 */
+.preview-source {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  width: var(--paper-width);
+  min-height: 0;
+}
+
+/* 分页预览：多页垂直排列，每页 A4 高度 */
+.preview-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.preview-page {
+  width: var(--paper-width);
+  height: var(--paper-height);
+  background: var(--paper-bg);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  overflow: hidden;
+  flex-shrink: 0;
+  font-family: var(--font-resume);
+}
+
+.preview-page .page-content {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--content-margin);
+  box-sizing: border-box;
+}
+
+.preview-paper {
+  width: var(--paper-width);
+  min-height: var(--paper-height);
+  background: var(--paper-bg);
+  overflow: hidden;
+  font-family: var(--font-resume);
+}
+
+/* ========== 简历顶栏：#e6f7ff 向右轻微渐变（不到纯白） ========== */
+.resume-header {
+  background: linear-gradient(
+    to right,
+    #e6f7ff 0%,
+    #eff9ff 45%,
+    #f3fbff 80%,
+    #f5fbff 100%
+  );
+  color: var(--header-text);
+  margin: calc(-1 * var(--content-margin)) calc(-1 * var(--content-margin)) 0.8cm calc(-1 * var(--content-margin));
+  padding: var(--content-margin) var(--content-margin) 16px var(--content-margin);
+  height: 4cm;
+  font-family: var(--font-resume);
+}
+
+.resume-name {
+  margin: -12px 0 12px 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: left;
+  font-family: var(--font-resume);
+  
+}
+
+.resume-meta-one-line {
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 400;
+  opacity: 0.98;
+  font-family: var(--font-resume);
+  margin-bottom: 0.15cm;
+}
+
+.resume-meta-one-line .sep {
+  margin: 0 8px;
+  opacity: 0.9;
+}
+
+/* ========== 简历正文单栏，与四边保持 1.15cm 间隔 ========== */
+.resume-body {
+  padding: 0;
+  padding-top: 0.6em;
+  font-family: var(--font-resume);
+}
+
+.resume-body .resume-block {
+  margin-bottom: 20px;
+}
+
+.resume-body .resume-block:last-child {
+  margin-bottom: 0;
+}
+
+/* ========== 模块标题（左侧浅蓝竖条，与图片一致） ========== */
+.resume-block {
+  position: relative;
+  margin-bottom: 30px;
+}
+
+.resume-block:last-child {
+  margin-bottom: 0;
+}
+
+/* 左侧倒垂组件：上方 0.3cm 方块，下方 0.1cm 竖线，高度与内容一致 */
+.resume-block::before,
+.resume-block::after {
+  content: '';
+  position: absolute;
+  background: var(--left-line);
+}
+
+/* 下方竖线：宽 0.05cm，高度覆盖整个模块内容区，水平居中对齐垂头 */
+.resume-block::before {
+  top: 0;
+  left: calc(0.8cm - var(--content-margin) + (0.1cm - 0.03cm) / 2);
+  width: 0.05cm;
+  height: 100%;
+}
+
+/* 上方倒垂块：宽 0.12cm，高 2.2em，中心与竖线对齐 */
+.resume-block::after {
+  top: -0.35em;
+  left: calc(0.8cm - var(--content-margin));
+  width: 0.12cm;
+  height: 2.2em;
+}
+
+/* 续页模块（如项目经历跨页的后半部分）不再绘制垂头，只保留竖线 */
+.resume-block-continued::after {
+  display: none;
+}
+
+.resume-block-title {
+  margin: 0 0 10px 0;
+  padding-left: 0.6cm;
+  padding-bottom: 0.2cm;
+  font-size: 18.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+  font-family: var(--font-resume);
+}
+
+.resume-block-content-skill {
+  padding-left: 0.6cm;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  font-family: var(--font-resume);
+}
+
+.resume-block-content {
+  padding-left: 0.6cm;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  font-family: var(--font-resume);
+}
+
+.resume-block-content p {
+  margin: 0 0 6px 0;
+  letter-spacing: 0.5px;
+  font-size: 12.2px;
+  font-weight: 450;
+}
+
+.resume-block-content p:last-child {
+  margin-bottom: 0.6cm;
+}
+
+.resume-block-content ul {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+  letter-spacing: 0.5px;
+  list-style-type: square;
+  font-size: 12.2px;
+  font-weight: 450;
+}
+
+.resume-block-content ol {
+  list-style-type: decimal;
+  padding-left: 20px;
+}
+
+/* 教育经历：学校 / 学历 / 专业 / 时间 同一行，列对齐 */
+.edu-head-line {
+  display: grid;
+  grid-template-columns: minmax(0, 0.25fr) minmax(0, 0.25fr) minmax(0, 0.25fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.edu-school {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.edu-degree,
+.edu-major {
+  color: var(--text-secondary);
+}
+
+.edu-time {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+/* 工作经历：第一行公司名加粗，第二行岗位缩进 + 时间右对齐 */
+.work-item {
+  margin-bottom: 12px;
+}
+
+.work-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 公司 / 岗位 / 时间：同一行，列对齐，时间靠右 */
+.work-head-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.work-company {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.work-position {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.work-time {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 项目经历：第一行项目名加粗，第二行角色缩进+时间右对齐，内容/业绩列表 */
+.project-item {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eee;
+}
+
+.project-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* 项目名称 / 角色 / 时间：同一行，列对齐，时间靠右 */
+.project-head-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) auto;
+  column-gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.project-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.project-role {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.project-time {
+  color: var(--text-secondary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.project-label {
+  font-weight: 700;
+  font-size: 14px;
+  margin: 8px 0 4px 0;
+  color: var(--text-primary);
+}
+
+.project-label:first-of-type {
+  margin-top: 0;
+}
+
+.project-content,
+.project-achieve {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* Markdown 渲染在预览中的样式 */
+.md-content h1, .md-content h2, .md-content h3 {
+  margin: 8px 0 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.md-content ul, .md-content ol {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.md-content ul {
+  list-style-type: square;
+}
+
+.md-content ol {
+  list-style-type: decimal;
+}
+
+.md-content li {
+  margin-bottom: 2px;
+}
+
+.md-content strong {
+  font-weight: 700;
+}
+
+/* Markdown 中的链接保持普通文字样式 */
+.md-content a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* PDF 导出时隐藏无关元素 */
+@media print {
+  .editor-panel,
+  .preview-panel .preview-wrap::before,
+  .btn-download {
+    display: none !important;
+  }
+  .preview-panel {
+    padding: 0;
+    background: #fff;
+  }
+  .preview-wrap {
+    box-shadow: none;
+    padding: 0;
+    background: #fff;
+  }
+}
