@@ -446,7 +446,6 @@
               list.push(wrap);
             });
           } else if (tag === 'p' && el.innerHTML && /<br\s*\/?>/i.test(el.innerHTML)) {
-            // p 内含 <br>（marked breaks:true），按行拆成多个 p
             const html = el.innerHTML;
             const parts = html.split(/<br\s*\/?>/i).map((s) => s.trim()).filter(Boolean);
             parts.forEach((part) => {
@@ -460,6 +459,40 @@
         });
 
         return list;
+      }
+
+      // 按字截断：当块溢出时，二分查找能容纳的最大字数，拆成「当前页部分 + 溢出部分」
+      function getTextFromBlock(node) {
+        if (!node) return '';
+        const tag = (node.tagName || '').toLowerCase();
+        if (tag === 'li') return (node.textContent || '').trim();
+        if (tag === 'ul' || tag === 'ol') {
+          const li = node.querySelector('li');
+          return li ? (li.textContent || '').trim() : '';
+        }
+        return (node.textContent || '').trim();
+      }
+
+      function createBlockWithText(origNode, text) {
+        const tag = (origNode.tagName || '').toLowerCase();
+        if (tag === 'ul' || tag === 'ol') {
+          const wrap = origNode.cloneNode(false);
+          const li = document.createElement('li');
+          li.textContent = text;
+          wrap.appendChild(li);
+          return wrap;
+        }
+        const p = document.createElement(tag === 'p' ? 'p' : 'p');
+        p.textContent = text;
+        return p;
+      }
+
+      function canSplitByChar(unit) {
+        if (!unit || !unit.node || !unit.subWrapperClass) return false;
+        const tag = (unit.node.tagName || '').toLowerCase();
+        if (tag !== 'p' && tag !== 'ul' && tag !== 'ol') return false;
+        const text = getTextFromBlock(unit.node);
+        return text.length > 1;
       }
 
       // project 模块：以「项目内的每一行/块」为单位分页（p / li 等），避免整段推到下一页造成大片留白
@@ -592,13 +625,45 @@
         }
       }
 
-      // 注意：这里不用 forEach，需做“标签 + 下一行”同页处理的 lookahead
+      // 注意：这里不用 forEach，需做“标签 + 下一行”同页处理的 lookahead；溢出时尝试按字截断
       for (let i = 0; i < units.length; i++) {
         const unit = units[i];
 
         appendUnit(unit);
         if (isOverflowing(pageContent)) {
           removeLastUnit(unit);
+          // 尝试按字截断：二分查找能容纳的最大字数
+          if (canSplitByChar(unit)) {
+            const fullText = getTextFromBlock(unit.node);
+            let lo = 0;
+            let hi = fullText.length;
+            while (lo < hi) {
+              const mid = Math.floor((lo + hi + 1) / 2);
+              const tryNode = createBlockWithText(unit.node, fullText.slice(0, mid));
+              stripIds(tryNode);
+              const tryUnit = { ...unit, node: tryNode };
+              appendUnit(tryUnit);
+              if (isOverflowing(pageContent)) {
+                removeLastUnit(tryUnit);
+                hi = mid - 1;
+              } else {
+                removeLastUnit(tryUnit);
+                lo = mid;
+              }
+            }
+            if (lo > 0) {
+              const fitNode = createBlockWithText(unit.node, fullText.slice(0, lo));
+              const restText = fullText.slice(lo);
+              stripIds(fitNode);
+              appendUnit({ ...unit, node: fitNode });
+              gotoNextPage();
+              const restNode = createBlockWithText(unit.node, restText);
+              stripIds(restNode);
+              units.splice(i, 1, { ...unit, node: restNode });
+              i -= 1; // 下一轮处理溢出部分（可能继续按字截断）
+              continue;
+            }
+          }
           gotoNextPage();
           appendUnit(unit);
         }
