@@ -398,8 +398,8 @@
         return;
       }
 
-    const children = Array.from(contentSrc.children);
-    if (children.length === 0) {
+      const children = Array.from(contentSrc.children);
+      if (children.length === 0) {
         const whole = blockSrc.cloneNode(true);
         appendBlockWithFit(whole);
         return;
@@ -427,64 +427,198 @@
         return { sec, content };
       };
 
-      // project 模块内容按照「项目内的每一行/块」为单位分页，
-      // 第二个项目可以从第一页开始，超出的部分自然接到下一页。
+      // 将 Markdown 容器（.md-content）按内部「行/块」拆成最小单元（p / li 等）
+      // 支持：ul/ol 按 li 拆；含 <br> 的 p 按行拆（marked breaks:true 时换行变 br）
+      function flattenMdContainer(container) {
+        const list = [];
+        if (!container) return list;
+        const nodes = Array.from(container.children || []);
+
+        nodes.forEach((el) => {
+          const tag = (el.tagName || '').toLowerCase();
+          if (tag === 'ul' || tag === 'ol') {
+            const liList = Array.from(el.children || []).filter(
+              (c) => (c.tagName || '').toLowerCase() === 'li'
+            );
+            liList.forEach((li) => {
+              const wrap = el.cloneNode(false);
+              wrap.appendChild(li.cloneNode(true));
+              list.push(wrap);
+            });
+          } else if (tag === 'p' && el.innerHTML && /<br\s*\/?>/i.test(el.innerHTML)) {
+            // p 内含 <br>（marked breaks:true），按行拆成多个 p
+            const html = el.innerHTML;
+            const parts = html.split(/<br\s*\/?>/i).map((s) => s.trim()).filter(Boolean);
+            parts.forEach((part) => {
+              const p = document.createElement('p');
+              p.innerHTML = part;
+              list.push(p);
+            });
+          } else {
+            list.push(el.cloneNode(true));
+          }
+        });
+
+        return list;
+      }
+
+      // project 模块：以「项目内的每一行/块」为单位分页（p / li 等），避免整段推到下一页造成大片留白
       const units = [];
+      let projectIndex = 0;
 
       children.forEach((child) => {
-        if (child.classList.contains('project-item')) {
+        if (child.classList && child.classList.contains('project-item')) {
           const wrapperClass = child.className || 'project-item';
-          const parts = Array.from(child.children);
-          parts.forEach((part) => {
-            const node = part.cloneNode(true);
-            stripIds(node);
-            units.push({ wrapperClass, node });
+          const wrapperKey = `project-${projectIndex++}`;
+
+          Array.from(child.children || []).forEach((part) => {
+            const isMdContent =
+              part.classList &&
+              part.classList.contains('md-content') &&
+              part.children &&
+              part.children.length > 0;
+
+            if (isMdContent) {
+              const subWrapperClass = part.className; // e.g. "project-achieve md-content"
+              const atoms = flattenMdContainer(part);
+              if (atoms.length === 0) {
+                const node = part.cloneNode(true);
+                stripIds(node);
+                units.push({ wrapperKey, wrapperClass, node, subWrapperClass: null, isLabel: false });
+              } else {
+                atoms.forEach((atom) => {
+                  stripIds(atom);
+                  units.push({ wrapperKey, wrapperClass, subWrapperClass, node: atom, isLabel: false });
+                });
+              }
+            } else {
+              const node = part.cloneNode(true);
+              stripIds(node);
+              const isLabel = !!(part.classList && part.classList.contains('project-label'));
+              units.push({ wrapperKey, wrapperClass, node, subWrapperClass: null, isLabel });
+            }
           });
         } else {
           const node = child.cloneNode(true);
           stripIds(node);
-          units.push({ wrapperClass: null, node });
+          units.push({ wrapperKey: null, wrapperClass: null, node, subWrapperClass: null, isLabel: false });
         }
       });
 
       let current = makeSectionFirst();
       appendBlockWithFit(current.sec);
-      let currentWrapper = null;
 
-      units.forEach((unit) => {
-        if (unit.wrapperClass) {
-          if (!currentWrapper || currentWrapper.className !== unit.wrapperClass) {
-            currentWrapper = document.createElement('div');
-            currentWrapper.className = unit.wrapperClass;
-            current.content.appendChild(currentWrapper);
-          }
-          currentWrapper.appendChild(unit.node);
-          if (isOverflowing(pageContent)) {
-            // 当前块放不下，挪到下一页的“续页” section
-            currentWrapper.removeChild(unit.node);
-            if (!currentWrapper.children.length) {
-              current.content.removeChild(currentWrapper);
-            }
-            pageContent = createPreviewPage(pagesContainer);
-            current = makeSectionContinue();
-            pageContent.appendChild(current.sec);
-            currentWrapper = document.createElement('div');
-            currentWrapper.className = unit.wrapperClass;
-            current.content.appendChild(currentWrapper);
-            currentWrapper.appendChild(unit.node);
-          }
+      let currentWrapperKey = null;
+      let currentWrapper = null;
+      let currentSubWrapperClass = null;
+      let currentSubWrapper = null;
+
+      function resetWrapperState() {
+        currentWrapperKey = null;
+        currentWrapper = null;
+        currentSubWrapperClass = null;
+        currentSubWrapper = null;
+      }
+
+      function gotoNextPage() {
+        pageContent = createPreviewPage(pagesContainer);
+        current = makeSectionContinue();
+        pageContent.appendChild(current.sec);
+        resetWrapperState();
+      }
+
+      function ensureWrapper(unit) {
+        if (!unit.wrapperKey) return;
+        if (unit.wrapperKey !== currentWrapperKey) {
+          currentWrapperKey = unit.wrapperKey;
+          currentWrapper = document.createElement('div');
+          currentWrapper.className = unit.wrapperClass || 'project-item';
+          current.content.appendChild(currentWrapper);
+          currentSubWrapperClass = null;
+          currentSubWrapper = null;
+        }
+      }
+
+      function ensureSubWrapper(unit) {
+        if (!unit.subWrapperClass) return;
+        if (!currentWrapper) return;
+        if (!currentSubWrapper || currentSubWrapperClass !== unit.subWrapperClass) {
+          currentSubWrapperClass = unit.subWrapperClass;
+          currentSubWrapper = document.createElement('div');
+          currentSubWrapper.className = unit.subWrapperClass;
+          currentWrapper.appendChild(currentSubWrapper);
+        }
+      }
+
+      function appendUnit(unit) {
+        if (!unit.wrapperKey) {
+          current.content.appendChild(unit.node);
+          return;
+        }
+        ensureWrapper(unit);
+        if (unit.subWrapperClass) {
+          ensureSubWrapper(unit);
+          currentSubWrapper.appendChild(unit.node);
         } else {
-          const node = unit.node;
-          current.content.appendChild(node);
-          if (isOverflowing(pageContent)) {
-            current.content.removeChild(node);
-            pageContent = createPreviewPage(pagesContainer);
-            current = makeSectionContinue();
-            pageContent.appendChild(current.sec);
-            current.content.appendChild(node);
+          currentWrapper.appendChild(unit.node);
+        }
+      }
+
+      function removeLastUnit(unit) {
+        if (unit && unit.node && unit.node.parentNode) {
+          const parent = unit.node.parentNode;
+          parent.removeChild(unit.node);
+
+          // subWrapper 空了就移除
+          if (
+            unit.subWrapperClass &&
+            parent &&
+            parent.classList &&
+            parent.className === unit.subWrapperClass &&
+            parent.childElementCount === 0
+          ) {
+            if (parent.parentNode) parent.parentNode.removeChild(parent);
+            if (currentSubWrapper === parent) {
+              currentSubWrapper = null;
+              currentSubWrapperClass = null;
+            }
           }
         }
-      });
+
+        // wrapper 空了就移除
+        if (currentWrapper && currentWrapper.childElementCount === 0) {
+          if (currentWrapper.parentNode) currentWrapper.parentNode.removeChild(currentWrapper);
+          resetWrapperState();
+        }
+      }
+
+      // 注意：这里不用 forEach，需做“标签 + 下一行”同页处理的 lookahead
+      for (let i = 0; i < units.length; i++) {
+        const unit = units[i];
+
+        appendUnit(unit);
+        if (isOverflowing(pageContent)) {
+          removeLastUnit(unit);
+          gotoNextPage();
+          appendUnit(unit);
+        }
+
+        // 避免「内容:」「业绩:」标签孤立在页尾：标签后至少放得下一行 p/li，否则整体挪到下一页
+        if (unit.isLabel) {
+          const next = units[i + 1];
+          if (next && next.wrapperKey && next.wrapperKey === unit.wrapperKey && next.subWrapperClass) {
+            appendUnit(next);
+            if (isOverflowing(pageContent)) {
+              removeLastUnit(next);
+              removeLastUnit(unit);
+              gotoNextPage();
+              appendUnit(unit);
+              appendUnit(next);
+            }
+            i += 1; // next 已消费，无论是否溢出都跳过
+          }
+        }
+      }
     };
 
     blocksSrc.forEach((blockSrc) => {

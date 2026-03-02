@@ -396,7 +396,7 @@ body {
 }
 
 .resume-block-content p:last-child {
-  margin-bottom: 0.6cm;
+  margin-bottom: 0cm;
 }
 
 .resume-block-content ul {
@@ -477,17 +477,11 @@ body {
   white-space: nowrap;
 }
 
-/* 项目经历：第一行项目名加粗，第二行角色缩进+时间右对齐，内容/业绩列表 */
+/* 项目经历：第一行项目名加粗，第二行角色缩进+时间右对齐，内容/业绩列表，项目间无横线 */
 .project-item {
+  display: block !important;
   margin-bottom: 16px;
   padding-bottom: 14px;
-  border-bottom: 1px solid #eee;
-}
-
-.project-item:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
 }
 
 /* 项目名称 / 角色 / 时间：同一行，列对齐，时间靠右 */
@@ -534,6 +528,8 @@ body {
   font-size: 12px;
   line-height: 1.55;
   color: var(--text-secondary);
+  page-break-inside: auto;
+  break-inside: auto;
 }
 
 /* Markdown 渲染在预览中的样式 */
