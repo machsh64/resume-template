@@ -531,6 +531,18 @@
   document.getElementById('addWork').addEventListener('click', () => addWorkItem());
   document.getElementById('addProject').addEventListener('click', () => addProjectItem());
 
+  // 简历字体：左侧下拉选择，预览与导出共用
+  const resumeFontSelect = document.getElementById('resumeFont');
+  const previewWrap = document.querySelector('.preview-wrap');
+  function applyResumeFont() {
+    const value = resumeFontSelect?.value;
+    if (value && previewWrap) previewWrap.style.setProperty('--font-resume', value);
+  }
+  if (resumeFontSelect) {
+    resumeFontSelect.addEventListener('change', applyResumeFont);
+    applyResumeFont();
+  }
+
   // 保存 JSON：调用后端 /api/resume 自动写入 data.json
   document.getElementById('btnSaveJson').addEventListener('click', async function () {
     const data = collectFormData();
