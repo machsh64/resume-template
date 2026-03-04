@@ -29,18 +29,36 @@ body {
 
 .app {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
-/* ========== 左侧编辑区 ========== */
+/* ========== 左侧编辑区：可拖拽调整宽度 ========== */
 .editor-panel {
-  width: 400px;
-  min-width: 360px;
+  width: var(--editor-width, 600px);
+  min-width: 320px;
+  max-width: 60vw;
+  flex-shrink: 0;
   background: #fff;
-  border-right: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 左右分栏拖拽条 */
+.panel-resizer {
+  width: 6px;
+  flex-shrink: 0;
+  background: var(--border-light);
+  cursor: col-resize;
+  transition: background 0.15s;
+}
+.panel-resizer:hover,
+.panel-resizer.resizing {
+  background: var(--title-bar);
+}
+.panel-resizer.resizing {
+  user-select: none;
 }
 
 .editor-header {
@@ -204,9 +222,10 @@ body {
   background: #d0d0d0;
 }
 
-/* ========== 右侧预览区 ========== */
+/* ========== 右侧预览区：独立滚动 ========== */
 .preview-panel {
   flex: 1;
+  min-width: 0;
   padding: 24px;
   overflow: auto;
   display: flex;

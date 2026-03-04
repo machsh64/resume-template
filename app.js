@@ -773,6 +773,52 @@
     }
   });
 
+  // 左右分栏拖拽调整：左侧编辑区宽度可横拉
+  (function () {
+    const resizer = document.getElementById('panelResizer');
+    const app = document.querySelector('.app');
+    const editorPanel = document.querySelector('.editor-panel');
+    if (!resizer || !app || !editorPanel) return;
+    const MIN = 320;
+    const MAX = Math.max(MIN, window.innerWidth * 0.6);
+    let startX = 0;
+    let startW = 0;
+
+    function getWidth() {
+      const w = parseFloat(getComputedStyle(editorPanel).width);
+      return isNaN(w) ? 400 : Math.round(w);
+    }
+
+    function setWidth(px) {
+      const w = Math.min(MAX, Math.max(MIN, px));
+      document.documentElement.style.setProperty('--editor-width', w + 'px');
+      try { localStorage.setItem('resume-editor-width', String(w)); } catch (_) {}
+    }
+
+    try {
+      const saved = parseInt(localStorage.getItem('resume-editor-width'), 10);
+      if (!isNaN(saved) && saved >= MIN) setWidth(saved);
+    } catch (_) {}
+
+    resizer.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      resizer.classList.add('resizing');
+      startX = e.clientX;
+      startW = getWidth();
+      const onMove = function (ev) {
+        const dx = ev.clientX - startX;
+        setWidth(startW + dx);
+      };
+      const onUp = function () {
+        resizer.classList.remove('resizing');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  })();
+
   // PDF 下载：导出分页容器，内容按 A4 高度自动分页
   document.getElementById('btnDownload').addEventListener('click', function () {
     const pagesContainer = document.getElementById('previewPages');
